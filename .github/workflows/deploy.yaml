@@ -1,0 +1,30 @@
+name: Node js API deployment
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Generate deployment package
+        run: zip -r deploy.zip . -x '.git' -x 'node_modules/'
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v20
+        with:
+          aws_access_key: ${{ secrets.AWS_PROD_ACCESS_KEY_ID  }}
+          aws_secret_key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
+          application_name: node-js-api
+          environment_name: Node-js-api-env
+          existing_bucket_name: elasticbeanstalk-ap-south-1-428101261201
+          version_label: ${{ github.sha }}
+          region: ap-south-1
+          use_existing_version_if_available: true
+          deployment_package: deploy.zip
+          wait_for_deployment: true
