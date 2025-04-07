@@ -20,8 +20,8 @@ jobs:
         with:
           aws_access_key: ${{ secrets.AWS_PROD_ACCESS_KEY_ID  }}
           aws_secret_key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
-          application_name: node-js-api
-          environment_name: Node-js-api-env
+          application_name: Drain-backend
+          environment_name: Drain-backend-env
           existing_bucket_name: elasticbeanstalk-ap-south-1-428101261201
           version_label: ${{ github.sha }}
           region: ap-south-1
